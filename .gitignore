@@ -34,3 +34,4 @@
 # CMake and build dirs
 build/
 lx04-mount-config/
+.idea
