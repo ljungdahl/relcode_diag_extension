@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(relcode)
+project(relcode_diag_extension)
 enable_language(Fortran)
 
 
@@ -13,11 +13,11 @@ include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
 include_directories(${MKL_DIR}/include/intel64/lp64)
 include_directories(${MKL_DIR}/include)
 
-#set(CMAKE_Fortran_COMPILER gfortran-9)
-set(CMAKE_Fortran_COMPILER gfortran)
+set(CMAKE_C_COMPILER gcc-9)
+set(CMAKE_Fortran_COMPILER gfortran-9)
 
 set(CMAKE_Fortran_FLAGS
-        "-O3 -fopenmp -cpp -ffree-line-length-none")
+        "-Og -fopenmp -cpp -ffree-line-length-none -fbacktrace -fbounds-check")
 
 
 set(LIBMKL ${MKL_DIR}/lib/intel64/libmkl_blas95_lp64.a
@@ -44,8 +44,11 @@ set(F90SRC
 
 # fortran module source files *_mod.f90
 set(MODSRC
-        src/types_mod.f90
-        src/intrinsics_mod.f90)
+        src/perturbed_wavefunction_mod.f90
+        src/photons_mod.f90
+        src/in_data_mod.f90
+        src/intrinsics_mod.f90
+        src/types_mod.f90)
 
 # this is only for IDE purposes to parse the macros.
 set(PREPROCESSOR_MACRO_SRC src/logger.h)

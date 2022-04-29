@@ -1,4 +1,4 @@
-! This module imports intrinsic values, ie precision intrinsics, for use
+! This module imports compiler intrinsic values, ie precision intrinsics, for use
 ! throughout the program
 module intrinsics_mod
     use, intrinsic :: iso_fortran_env, only: REAL64, REAL32
