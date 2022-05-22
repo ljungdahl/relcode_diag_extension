@@ -13,10 +13,11 @@ module in_data_mod
 
     public In_Metadata_t, read_metadata, check_if_subdir_exists, &
             read_complex_array_binary_rank1, read_complex_array_binary_rank2, read_complex_array_binary_rank3, &
-            read_integer_array_binary_rank2
+            read_integer_array_binary_rank2, read_input_parameters, Input_Parameters_t
 
-    character(len=*), parameter :: bin_metadata_arrsize_format_str = &
-    "(i0, a, i0, a, i0, a, i0, a, i0, a, i0, a, i0)"
+    character(len = *), parameter :: input_params_filename = "diag_ext.input"
+    character(len = *), parameter :: bin_metadata_arrsize_format_str = &
+            "(i0, a, i0, a, i0, a, i0, a, i0, a, i0, a, i0)"
 
     ! -----
 
@@ -29,7 +30,69 @@ module in_data_mod
         logical :: is_read
     end type In_Metadata_t
 
+    ! -----
+
+    type :: Input_Parameters_t
+        integer :: number_of_photons, number_of_indices_to_remove
+        real(dp) :: start_eV, end_eV
+        real(dp) :: Z
+        integer, allocatable, dimension(:) :: indices_to_remove
+    end type Input_Parameters_t
+
 contains
+    ! ================================================================================================
+
+    subroutine read_input_parameters(in_params)
+        type(Input_Parameters_t), intent(out) :: in_params
+
+        integer :: file_id, stat, i
+        character(len = MAX_CHAR_LENGTH) :: comment_line
+
+        file_id = 102
+        open(file_id, file = trim(input_params_filename), status = 'old', action = 'read', iostat = stat)
+
+        if(stat /= 0) then
+            write(*, *) "FATAL ERROR! Cannot open file ", trim(input_params_filename)
+            call exit(1)
+        end if
+
+        read(file_id, '(a)') comment_line
+        read(file_id, *) in_params%Z
+        read(file_id, '(a)') comment_line
+        read(file_id, *) in_params%number_of_photons
+        read(file_id, '(a)') comment_line
+        read(file_id, *) in_params%start_eV
+        read(file_id, '(a)') comment_line
+        read(file_id, *) in_params%end_eV
+        read(file_id, '(a)') comment_line
+        read(file_id, *) in_params%number_of_indices_to_remove
+
+        if(in_params%number_of_indices_to_remove > 0) then
+            read(file_id, '(a)') comment_line
+            allocate(in_params%indices_to_remove(in_params%number_of_indices_to_remove))
+            do i = 1, in_params%number_of_indices_to_remove
+                read(file_id, *) in_params%indices_to_remove(i)
+            end do
+        end if
+
+        close(file_id)
+
+        LOG_WRITE "Read input parameters from file ", trim(input_params_filename)
+        LOG_WRITE "Atom Z = ", in_params%Z
+        LOG_WRITE "number_of_photons = ", in_params%number_of_photons
+        LOG_WRITE "start_eV = ", in_params%start_eV
+        LOG_WRITE "end_eV = ", in_params%end_eV
+        LOG_WRITE "number of indices to remove =", in_params%number_of_indices_to_remove
+        if(in_params%number_of_indices_to_remove > 0) then
+            LOG_WRITE "indices to remove:"
+            do i = 1, in_params%number_of_indices_to_remove
+                LOG_WRITE in_params%indices_to_remove(i)
+            end do
+        end if
+
+        LOG_WRITE " "
+
+    end subroutine read_input_parameters
 
     ! ================================================================================================
 
@@ -103,9 +166,9 @@ contains
         read(meta_data%non_comment_lines(1), *) &
                 sizes(1), sizes(2), sizes(3), sizes(4), sizes(5), sizes(6), sizes(7)
 
-!        do i = 1, size(sizes)
-!            LOG_WRITE i, sizes(i)
-!        end do
+        !        do i = 1, size(sizes)
+        !            LOG_WRITE i, sizes(i)
+        !        end do
 
         ! Whenever we encounter a zero in the sizes we know we've got the max rank.
         in_data_rank = 0
@@ -133,19 +196,19 @@ contains
     ! ================================================================================================
 
     subroutine read_complex_array_binary_rank1(filename_prefix, meta_data, array_to_be_filled)
-        use intrinsics_mod, only: dp
+        use intrinsics_mod, only : dp
         use types_mod, only : data_from_relcode_dir
 
-        character(len=*), intent(in) :: filename_prefix
+        character(len = *), intent(in) :: filename_prefix
         type(In_Metadata_t), intent(in) :: meta_data
         complex(dp), dimension(meta_data%sizes(1)), intent(out) :: array_to_be_filled
 
-        character(len=MAX_CHAR_LENGTH) :: filename
+        character(len = MAX_CHAR_LENGTH) :: filename
         integer :: file_id
 
         file_id = 45
 
-        filename = trim(data_from_relcode_dir)//trim(filename_prefix)//".bin"
+        filename = trim(data_from_relcode_dir) // trim(filename_prefix) // ".bin"
 
         open(file_id, file = trim(filename), form = "unformatted")
         read(file_id) array_to_be_filled
@@ -156,19 +219,19 @@ contains
     ! ================================================================================================
 
     subroutine read_complex_array_binary_rank2(filename_prefix, meta_data, array_to_be_filled)
-        use intrinsics_mod, only: dp
+        use intrinsics_mod, only : dp
         use types_mod, only : data_from_relcode_dir
 
-        character(len=*), intent(in) :: filename_prefix
+        character(len = *), intent(in) :: filename_prefix
         type(In_Metadata_t), intent(in) :: meta_data
         complex(dp), dimension(meta_data%sizes(1), meta_data%sizes(2)), intent(out) :: array_to_be_filled
 
-        character(len=MAX_CHAR_LENGTH) :: filename
+        character(len = MAX_CHAR_LENGTH) :: filename
         integer :: file_id
 
         file_id = 45
 
-        filename = trim(data_from_relcode_dir)//trim(filename_prefix)//".bin"
+        filename = trim(data_from_relcode_dir) // trim(filename_prefix) // ".bin"
 
         open(file_id, file = trim(filename), form = "unformatted")
         read(file_id) array_to_be_filled
@@ -179,44 +242,42 @@ contains
     ! ================================================================================================
 
     subroutine read_complex_array_binary_rank3(filename_prefix, meta_data, array_to_be_filled)
-        use intrinsics_mod, only: dp
+        use intrinsics_mod, only : dp
         use types_mod, only : data_from_relcode_dir
 
-        character(len=*) :: filename_prefix
+        character(len = *) :: filename_prefix
         type(In_Metadata_t), intent(in) :: meta_data
-        complex(dp), dimension(meta_data%sizes(1),meta_data%sizes(2),meta_data%sizes(3)), intent(out) :: array_to_be_filled
+        complex(dp), dimension(meta_data%sizes(1), meta_data%sizes(2), meta_data%sizes(3)), intent(out) :: array_to_be_filled
 
-        character(len=MAX_CHAR_LENGTH) :: filename
+        character(len = MAX_CHAR_LENGTH) :: filename
         integer :: file_id
 
         file_id = 45
 
-        filename = trim(data_from_relcode_dir)//trim(filename_prefix)//".bin"
+        filename = trim(data_from_relcode_dir) // trim(filename_prefix) // ".bin"
 
         open(file_id, file = trim(filename), form = "unformatted")
         read(file_id) array_to_be_filled
         close(file_id)
-
-
 
     end subroutine read_complex_array_binary_rank3
 
     ! ================================================================================================
 
     subroutine read_integer_array_binary_rank2(filename_prefix, meta_data, array_to_be_filled)
-        use intrinsics_mod, only: dp
+        use intrinsics_mod, only : dp
         use types_mod, only : data_from_relcode_dir
 
-        character(len=*), intent(in) :: filename_prefix
+        character(len = *), intent(in) :: filename_prefix
         type(In_Metadata_t), intent(in) :: meta_data
         integer, dimension(meta_data%sizes(1), meta_data%sizes(2)), intent(out) :: array_to_be_filled
 
-        character(len=MAX_CHAR_LENGTH) :: filename
+        character(len = MAX_CHAR_LENGTH) :: filename
         integer :: file_id
 
         file_id = 45
 
-        filename = trim(data_from_relcode_dir)//trim(filename_prefix)//".bin"
+        filename = trim(data_from_relcode_dir) // trim(filename_prefix) // ".bin"
 
         open(file_id, file = trim(filename), form = "unformatted")
         read(file_id) array_to_be_filled
@@ -230,13 +291,13 @@ contains
         use types_mod, only : data_from_relcode_dir
         implicit none
 
-        character(len=MAX_CHAR_LENGTH) :: dir_path_no_ending_slash
+        character(len = MAX_CHAR_LENGTH) :: dir_path_no_ending_slash
         integer :: dir_str_len
         logical :: dir_exists
 
         dir_str_len = len(trim(data_from_relcode_dir))
         dir_path_no_ending_slash = trim(data_from_relcode_dir)
-        dir_path_no_ending_slash = dir_path_no_ending_slash(1:dir_str_len-1)
+        dir_path_no_ending_slash = dir_path_no_ending_slash(1:dir_str_len - 1)
         !LOG_WRITE trim(dir_path_no_ending_slash)
         inquire(file = trim(dir_path_no_ending_slash), exist = dir_exists)
 

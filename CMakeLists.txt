@@ -36,7 +36,9 @@ set(LFLAGS -fopenmp -m64)
 link_libraries(${LIBMKL} ${LFLAGS})
 
 # fixed format .f
-set(FIXEDSRC )
+set(FIXEDSRC 
+        src/coulcc.f
+        src/coul_gen_cc_rel.f)
 
 # free format .f90
 set(F90SRC
@@ -48,7 +50,10 @@ set(MODSRC
         src/photons_mod.f90
         src/in_data_mod.f90
         src/intrinsics_mod.f90
-        src/types_mod.f90)
+        src/types_mod.f90
+        src/ionisation_mod.f90
+        src/output_data_mod.f90
+        src/utility_mod.f90)
 
 # this is only for IDE purposes to parse the macros.
 set(PREPROCESSOR_MACRO_SRC src/logger.h)

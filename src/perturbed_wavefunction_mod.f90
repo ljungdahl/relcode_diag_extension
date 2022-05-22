@@ -3,6 +3,7 @@ module perturbed_wavefunction_mod
     use intrinsics_mod, only : dp
     use types_mod, only : Channel_Index_t, HartreeFock_t, Matrix_Parameters_t, Diag_t, Bsplines_t, &
             Channel_Indices_t
+    use in_data_mod, only : Input_Parameters_t
     implicit none
 
     private
@@ -20,6 +21,9 @@ module perturbed_wavefunction_mod
         ! All in all this means that we have size_rhs coefficients (and we get size_rhs from the
         ! Hartree_Fock_t structure).
         complex(dp), allocatable, dimension(:) :: bspline_coefficients
+        integer :: num_bspl_coeffs
+        ! We also store the ionisation rate per photon energy omegaXUV here.
+        complex(dp), allocatable, dimension(:) :: rate
     end type Perturbed_Wavefunction_t
 
     ! -----
@@ -28,16 +32,18 @@ contains
 
     ! ============================================================================
 
-    subroutine init_pwf(pwf, channel, hf)
+    subroutine init_pwf(pwf, channel, hf, num_photons)
         type(Perturbed_Wavefunction_t), intent(out) :: pwf
         type(Channel_Index_t), intent(in) :: channel
         type(HartreeFock_t), intent(in) :: hf
+        integer, intent(in) :: num_photons
 
         integer :: num_bspl_coeffs
 
         num_bspl_coeffs = hf%size_rhs
+        pwf%num_bspl_coeffs = num_bspl_coeffs
 
-        pwf%hole_kappa  = channel%hole_kappa
+        pwf%hole_kappa = channel%hole_kappa
         pwf%final_kappa = channel%final_kappa
 
         if(allocated(pwf%bspline_coefficients)) then
@@ -46,12 +52,19 @@ contains
             allocate(pwf%bspline_coefficients(num_bspl_coeffs))
         end if
 
+        if(allocated(pwf%rate)) then
+            LOG_FATAL("pwf%rate already allocated")
+        else
+            allocate(pwf%rate(num_photons))
+        end if
+
     end subroutine init_pwf
 
     ! ============================================================================
 
-    subroutine compute_bspline_coefficients(num_channels, diag, matrix_params, &
+    subroutine compute_bspline_coefficients(input_params, num_channels, diag, matrix_params, &
             chan_idxs, hf, bsplines, omega, list_of_pwfs)
+        type(Input_Parameters_t), intent(in) :: input_params
         integer, intent(in) :: num_channels
         type(Diag_t), intent(in) :: diag
         type(Matrix_Parameters_t), intent(in) :: matrix_params
@@ -61,8 +74,11 @@ contains
         real(dp), intent(in) :: omega ! XUV photon energy in atomic units
         type(Perturbed_Wavefunction_t), dimension(num_channels), intent(inout) :: list_of_pwfs
 
-        complex(dp) :: c_i
-        integer :: i,j,is,ks, current_channel_index
+        !complex(dp), dimension(diag%system_size) :: pertmat
+        complex(dp), dimension(size(diag%matrix_elements)) :: M
+        complex(dp) :: pertmat
+
+        integer :: i, j, is, ks, current_channel_index, remove_index
         ! This routine forms all the Bspline coefficients for the perturbed wave function, by
         ! multiplying and summing up all the "matrix element" coefficients from diagonalisation.
         ! The same procedure is done in relcode after solution of the linear system of equations.
@@ -75,20 +91,31 @@ contains
             list_of_pwfs(i)%bspline_coefficients = (0.0_dp, 0.0_dp)
         end do
 
+        M = diag%matrix_elements
+        do i = 1, input_params%number_of_indices_to_remove
+            remove_index = input_params%indices_to_remove(i)
+            M(remove_index) = cmplx(0.0_dp, 0.0_dp)
+        end do
         ! Starting channel
         current_channel_index = 1
 
-        do i=1,diag%system_size
+!        do i = 1, diag%system_size
+!            ! Here we form the diag coefficents c_k with correct energy denominator.
+!            ! pertmat = matrix_elements(i)/(eigenvalues(i) - omega), with
+!            ! matrix_elements(i) = sum(psi_i*dipole_elements), where psi_i is eigenvector i
+!            ! and eigenvalues(i) = (\epsilon_a-\epsilon_s)_i after diagonalisation.
+!
+!        end do
+
+        do i = 1, diag%system_size
             ! These indices are used to get the proper hf coefficients.
             ! (Ie how we get coefficients for different quantum numbers in Jimmy's system)
             is = matrix_params%qn_indices(i, 1)
             ks = matrix_params%qn_indices(i, 2)
 
-            ! Here we form the diag coefficents c_k with correct energy denominator.
-            ! c_i = matrix_elements(i)/(eigenvalues(i) - omega), with
-            ! matrix_elements(i) = sum(psi_i*dipole_elements), where psi_i is eigenvector i
-            ! and eigenvalues(i) = (\epsilon_a-\epsilon_s)_i after diagonalisation.
-            c_i = diag%matrix_elements(i)/(diag%eigenvalues(i) - dcmplx(omega, 0.0_dp) )
+            ! TODO(anton): Understand this again... basis change?
+            ! "pertmat" notation is from my old krylov version (perturbed_wf_construction.f90)
+            pertmat = sum( diag%eigenvectors(i, :)*M / (diag%eigenvalues - dcmplx(omega, 0.0_dp)))
 
             ! Check if we have a new channel, if so increment channel index.
             if(i > chan_idxs%channel(current_channel_index)%end_idx) then
@@ -104,12 +131,9 @@ contains
             ! Bspline basis.
             list_of_pwfs(current_channel_index)%bspline_coefficients(:) = &
                     list_of_pwfs(current_channel_index)%bspline_coefficients(:) + &
-                            hf%eigenstates(:, is, ks)*c_i
+                            hf%eigenstates(:, is, ks) * pertmat
 
         end do
-
-
-
 
     end subroutine
 

@@ -17,6 +17,7 @@ module types_mod
         integer :: system_size
         complex(dp), allocatable, dimension(:) :: eigenvalues
         complex(dp), allocatable, dimension(:) :: matrix_elements
+        complex(dp), allocatable, dimension(:, :) :: eigenvectors
     end type Diag_t
 
     ! -----
@@ -56,6 +57,7 @@ module types_mod
         integer :: hole_kappa, hole_l, hole_j
         integer :: final_kappa
         integer :: start_idx, end_idx
+		complex(dp) :: hole_binding_energy
         character(len = 1024) :: print_string
     contains
         procedure, private :: channel_index_write_unformatted
@@ -91,6 +93,7 @@ contains
         write(unit, iostat = iostat, iomsg = iomsg) dtv%hole_kappa, dtv%hole_l, dtv%hole_j
         write(unit, iostat = iostat, iomsg = iomsg) dtv%final_kappa
         write(unit, iostat = iostat, iomsg = iomsg) dtv%start_idx, dtv%end_idx
+		write(unit, iostat = iostat, iomsg = iomsg) dtv%hole_binding_energy
         write(unit, iostat = iostat, iomsg = iomsg) dtv%print_string
 
     end subroutine channel_index_write_unformatted
@@ -106,6 +109,7 @@ contains
         read(unit, iostat = iostat, iomsg = iomsg) dtv%hole_kappa, dtv%hole_l, dtv%hole_j
         read(unit, iostat = iostat, iomsg = iomsg) dtv%final_kappa
         read(unit, iostat = iostat, iomsg = iomsg) dtv%start_idx, dtv%end_idx
+		read(unit, iostat = iostat, iomsg = iomsg) dtv%hole_binding_energy
         read(unit, iostat = iostat, iomsg = iomsg) dtv%print_string
 
     end subroutine channel_index_read_unformatted
